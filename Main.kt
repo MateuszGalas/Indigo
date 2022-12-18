@@ -41,10 +41,13 @@ data class Card(val rank: Rank, val suit: Suit) {
     }
 }
 
-class Indigo() {
+class Indigo {
     var allCards: MutableList<Card> = buildDeck()
+    var cardsOnTheTable: MutableList<Card> = mutableListOf()
+    var cardsInPlayerHand: MutableList<Card> = mutableListOf()
+    var cardsInComputerHand: MutableList<Card> = mutableListOf()
 
-    fun buildDeck(): MutableList<Card> {
+    private fun buildDeck(): MutableList<Card> {
         val allCards = buildList {
             Suit.values().forEach { suit ->
                 Rank.values().forEach { rank ->
@@ -55,60 +58,81 @@ class Indigo() {
         return allCards
     }
 
-    fun getCards(number: String) {
-        if (!number.matches("""\d+""".toRegex())) {
-            println("Invalid number of cards.")
-            return
-        }
-        val number = number.toInt()
-
-        if (number !in 1..52) {
-            println("Invalid number of cards.")
-            return
-        }
-
-        if (allCards.size < number) {
-            println("The remaining cards are insufficient to meet the request.")
-            return
-        } else {
-            for (i in 1..number) {
-                print("${allCards.removeAt(0)} ")
-            }
-            println()
+    fun getCards(number: Int): MutableList<Card> {
+        allCards.subList(0, number).apply {
+            val cards = mutableListOf<Card>()
+            cards.addAll(this)
+            clear()
+            return cards
         }
     }
 }
 
-
 fun main() {
     val game = Indigo()
+    var player: Boolean?
+    game.allCards.shuffle()
+    println("Indigo Card Game")
 
     while (true) {
-        println("Choose an action (reset, shuffle, get, exit):")
-        val action = readln()
-        when (action) {
-            "reset" -> {
-                println("Card deck is reset.")
-                game.allCards = game.buildDeck()
+        println("Play first?")
+        readln().apply {
+            player = if (equals("yes", true)) {
+                true
+            } else if (equals("no", true)) {
+                false
+            } else {
+                null
             }
+        }
+        if (player == null) continue
+        break
+    }
+    game.cardsOnTheTable = game.getCards(4)
+    println("Initial cards on the table: ${game.cardsOnTheTable.joinToString(" ")}")
+    println()
 
-            "shuffle" -> {
-                println("Card deck is shuffled.")
-                game.allCards.shuffle()
-            }
+    while (true) {
+        println("${game.cardsOnTheTable.size} cards on the table, and the top card is ${game.cardsOnTheTable.last()}")
 
-            "get" -> {
-                println("Number of cards:")
-                game.getCards(readln())
-            }
-
-            "exit" -> {
-                println("Bye")
-                break
-            }
-
-            else -> println("Wrong action.")
+        if (game.allCards.size == 0 && game.cardsInPlayerHand.size == 0 && game.cardsInComputerHand.size == 0) break
+        if (game.cardsInComputerHand.size == 0 && game.cardsInPlayerHand.size == 0) {
+            game.cardsInComputerHand = game.getCards(6)
+            game.cardsInPlayerHand = game.getCards(6)
         }
 
+        if (player == true) {
+            print("Cards in hand: ")
+            game.cardsInPlayerHand.forEach {
+                print("${game.cardsInPlayerHand.indexOf(it) + 1})$it ")
+            }
+            println()
+            var cardToPlay: Int?
+            while (true) {
+                println("Choose a card to play (1-${game.cardsInPlayerHand.size}):")
+                cardToPlay = readln().let {
+                    if (it.matches("""\d+""".toRegex())) {
+                        it.toInt()
+                    } else if (it.equals("exit", true)) {
+                        return println("Game Over")
+                    } else {
+                        null
+                    }
+                }
+                if ((cardToPlay == null) || (cardToPlay !in (1..game.cardsInPlayerHand.size))) continue
+                cardToPlay--
+                break
+            }
+            game.cardsOnTheTable.add(game.cardsInPlayerHand[cardToPlay!!])
+            game.cardsInPlayerHand.removeAt(cardToPlay)
+            player = false
+        } else {
+            println("Computer plays ${game.cardsInComputerHand[0]}")
+            game.cardsOnTheTable.add(game.cardsInComputerHand[0])
+            game.cardsInComputerHand.removeAt(0)
+            player = true
+        }
+        println()
     }
+    println("Game Over")
 }
