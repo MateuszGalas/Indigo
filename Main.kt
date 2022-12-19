@@ -1,5 +1,7 @@
 package indigo
 
+import java.lang.Exception
+
 enum class Rank(val symbol: String) {
     ACE("A"),
     TWO("2"),
@@ -41,11 +43,27 @@ data class Card(val rank: Rank, val suit: Suit) {
     }
 }
 
+data class Player(var score: Int, val player: String) {
+    val cards: MutableList<Card> = mutableListOf()
+
+    fun cardToPlay(): String {
+        println("Choose a card to play (1-${cards.size}):")
+        var cardToPlay = readln()
+        when {
+            cardToPlay.matches("""\d+""".toRegex()) && cardToPlay.toInt() in (1..cards.size) -> {
+                return cardToPlay
+            }
+
+            cardToPlay.equals("exit", true) -> throw Exception("Game Over")
+            else -> cardToPlay = cardToPlay()
+        }
+        return cardToPlay
+    }
+}
+
 class Indigo {
-    var allCards: MutableList<Card> = buildDeck()
-    var cardsOnTheTable: MutableList<Card> = mutableListOf()
-    var cardsInPlayerHand: MutableList<Card> = mutableListOf()
-    var cardsInComputerHand: MutableList<Card> = mutableListOf()
+    private val allCards: MutableList<Card> = buildDeck()
+    private val cardsOnTheTable: MutableList<Card> = mutableListOf()
 
     private fun buildDeck(): MutableList<Card> {
         val allCards = buildList {
@@ -58,7 +76,7 @@ class Indigo {
         return allCards
     }
 
-    fun getCards(number: Int): MutableList<Card> {
+    private fun getCards(number: Int): MutableList<Card> {
         allCards.subList(0, number).apply {
             val cards = mutableListOf<Card>()
             cards.addAll(this)
@@ -66,73 +84,74 @@ class Indigo {
             return cards
         }
     }
+
+    private fun turn(): Int {
+        println("Play first?")
+        val playersTurn = readln()
+
+        val turn = when (playersTurn.lowercase()) {
+            "yes" -> 0
+            "no" -> 1
+            else -> turn()
+        }
+        return turn
+    }
+
+    fun play() {
+        val player = Player(0, "Player")
+        val computer = Player( 0, "Computer")
+        allCards.shuffle()
+        println("Indigo Card Game")
+
+        var turn = turn()
+
+        cardsOnTheTable.addAll(getCards(4))
+        println("Initial cards on the table: ${cardsOnTheTable.joinToString(" ")}")
+        println()
+
+        while (true) {
+            println("${cardsOnTheTable.size} cards on the table, and the top card is ${cardsOnTheTable.last()}")
+            when {
+                (cardsOnTheTable.size == 52) -> break
+                (computer.cards.size + player.cards.size == 0) -> {
+                    computer.cards.addAll(getCards(6))
+                    player.cards.addAll(getCards(6))
+                }
+            }
+
+            val playerActions = {
+                print("Cards in hand: ")
+                player.cards.forEach {
+                    print("${player.cards.indexOf(it) + 1})$it ")
+                }
+                println()
+                val cardToPlay: String = player.cardToPlay()
+
+                cardsOnTheTable.add(player.cards[cardToPlay.toInt() - 1])
+                player.cards.removeAt(cardToPlay.toInt() - 1)
+                turn++
+            }
+            val computerActions = {
+                println("Computer plays ${computer.cards[0]}")
+                cardsOnTheTable.add(computer.cards[0])
+                computer.cards.removeAt(0)
+                turn--
+            }
+
+            val list = mutableListOf(playerActions, computerActions)
+            try {
+                list[turn].invoke()
+            } catch (e: Exception) {
+                break
+            }
+            println()
+        }
+        println("Game Over")
+    }
 }
+
 
 fun main() {
     val game = Indigo()
-    var player: Boolean?
-    game.allCards.shuffle()
-    println("Indigo Card Game")
-
-    while (true) {
-        println("Play first?")
-        readln().apply {
-            player = if (equals("yes", true)) {
-                true
-            } else if (equals("no", true)) {
-                false
-            } else {
-                null
-            }
-        }
-        if (player == null) continue
-        break
-    }
-    game.cardsOnTheTable = game.getCards(4)
-    println("Initial cards on the table: ${game.cardsOnTheTable.joinToString(" ")}")
-    println()
-
-    while (true) {
-        println("${game.cardsOnTheTable.size} cards on the table, and the top card is ${game.cardsOnTheTable.last()}")
-
-        if (game.allCards.size == 0 && game.cardsInPlayerHand.size == 0 && game.cardsInComputerHand.size == 0) break
-        if (game.cardsInComputerHand.size == 0 && game.cardsInPlayerHand.size == 0) {
-            game.cardsInComputerHand = game.getCards(6)
-            game.cardsInPlayerHand = game.getCards(6)
-        }
-
-        if (player == true) {
-            print("Cards in hand: ")
-            game.cardsInPlayerHand.forEach {
-                print("${game.cardsInPlayerHand.indexOf(it) + 1})$it ")
-            }
-            println()
-            var cardToPlay: Int?
-            while (true) {
-                println("Choose a card to play (1-${game.cardsInPlayerHand.size}):")
-                cardToPlay = readln().let {
-                    if (it.matches("""\d+""".toRegex())) {
-                        it.toInt()
-                    } else if (it.equals("exit", true)) {
-                        return println("Game Over")
-                    } else {
-                        null
-                    }
-                }
-                if ((cardToPlay == null) || (cardToPlay !in (1..game.cardsInPlayerHand.size))) continue
-                cardToPlay--
-                break
-            }
-            game.cardsOnTheTable.add(game.cardsInPlayerHand[cardToPlay!!])
-            game.cardsInPlayerHand.removeAt(cardToPlay)
-            player = false
-        } else {
-            println("Computer plays ${game.cardsInComputerHand[0]}")
-            game.cardsOnTheTable.add(game.cardsInComputerHand[0])
-            game.cardsInComputerHand.removeAt(0)
-            player = true
-        }
-        println()
-    }
-    println("Game Over")
+    game.play()
 }
