@@ -2,6 +2,8 @@ package indigo
 
 import java.lang.Exception
 
+const val cardsGivePoints = "A♠A♥A♦A♣10♠10♥10♦10♣J♠J♦J♥J♣Q♠Q♥Q♦Q♣K♠K♥K♦K♣"
+
 enum class Rank(val symbol: String) {
     ACE("A"),
     TWO("2"),
@@ -43,8 +45,9 @@ data class Card(val rank: Rank, val suit: Suit) {
     }
 }
 
-data class Player(var score: Int, val player: String) {
+data class Player(var cardsWon: Int, var score: Int, val player: String) {
     val cards: MutableList<Card> = mutableListOf()
+    var lastWon = false
 
     fun cardToPlay(): String {
         println("Choose a card to play (1-${cards.size}):")
@@ -98,26 +101,65 @@ class Indigo {
     }
 
     fun play() {
-        val player = Player(0, "Player")
-        val computer = Player( 0, "Computer")
+        val player = Player(0, 0, "Player")
+        val computer = Player(0, 0, "Computer")
         allCards.shuffle()
         println("Indigo Card Game")
 
         var turn = turn()
+        if (turn == 0) player.lastWon = true
 
         cardsOnTheTable.addAll(getCards(4))
         println("Initial cards on the table: ${cardsOnTheTable.joinToString(" ")}")
         println()
 
         while (true) {
-            println("${cardsOnTheTable.size} cards on the table, and the top card is ${cardsOnTheTable.last()}")
+            println()
+            if (!cardsOnTheTable.isEmpty()) {
+                println("${cardsOnTheTable.size} cards on the table, and the top card is ${cardsOnTheTable.last()}")
+            } else {
+                println("No cards on the table")
+            }
             when {
-                (cardsOnTheTable.size == 52) -> break
+                (allCards.isEmpty() && computer.cards.size + player.cards.size == 0) -> {
+                    if (player.cardsWon == computer.cardsWon && player.lastWon) {
+                        player.score += 3
+                    } else if (player.cardsWon == computer.cardsWon) {
+                        computer.score += 3
+                    } else if (player.cardsWon > computer.cardsWon) {
+                        player.score += 3
+                    } else {
+                        computer.score += 3
+                    }
+
+                    if (cardsOnTheTable.isNotEmpty() && player.lastWon) {
+                        cardsOnTheTable.forEach { if (cardsGivePoints.contains(it.toString())) player.score++ }
+                        player.cardsWon += cardsOnTheTable.size
+                        cardsOnTheTable.clear()
+                        println(
+                            "${player.player} wins cards\n" +
+                                    "Score: Player ${player.score} - Computer ${computer.score}\n" +
+                                    "Cards: Player ${player.cardsWon} - Computer ${computer.cardsWon}"
+                        )
+                    } else if (cardsOnTheTable.isNotEmpty()) {
+                        cardsOnTheTable.forEach { if (cardsGivePoints.contains(it.toString())) computer.score++ }
+                        computer.cardsWon += cardsOnTheTable.size
+                        cardsOnTheTable.clear()
+                        println(
+                            "${computer.player} wins cards\n" +
+                                    "Score: Player ${player.score} - Computer ${computer.score}\n" +
+                                    "Cards: Player ${player.cardsWon} - Computer ${computer.cardsWon}"
+                        )
+                    }
+                    break
+                }
+
                 (computer.cards.size + player.cards.size == 0) -> {
                     computer.cards.addAll(getCards(6))
                     player.cards.addAll(getCards(6))
                 }
             }
+
 
             val playerActions = {
                 print("Cards in hand: ")
@@ -127,13 +169,55 @@ class Indigo {
                 println()
                 val cardToPlay: String = player.cardToPlay()
 
-                cardsOnTheTable.add(player.cards[cardToPlay.toInt() - 1])
-                player.cards.removeAt(cardToPlay.toInt() - 1)
+                if (cardsOnTheTable.isNotEmpty()) {
+                    if (player.cards[cardToPlay.toInt() - 1].rank == cardsOnTheTable.last().rank ||
+                        player.cards[cardToPlay.toInt() - 1].suit == cardsOnTheTable.last().suit
+                    ) {
+                        cardsOnTheTable.add(player.cards[cardToPlay.toInt() - 1])
+                        player.cards.removeAt(cardToPlay.toInt() - 1)
+                        cardsOnTheTable.forEach { if (cardsGivePoints.contains(it.toString())) player.score++ }
+                        player.cardsWon += cardsOnTheTable.size
+                        cardsOnTheTable.clear()
+                        println(
+                            "${player.player} wins cards\n" +
+                                    "Score: Player ${player.score} - Computer ${computer.score}\n" +
+                                    "Cards: Player ${player.cardsWon} - Computer ${computer.cardsWon}"
+                        )
+                        player.lastWon = true
+                    } else {
+                        cardsOnTheTable.add(player.cards[cardToPlay.toInt() - 1])
+                        player.cards.removeAt(cardToPlay.toInt() - 1)
+                    }
+                } else {
+                    cardsOnTheTable.add(player.cards[cardToPlay.toInt() - 1])
+                    player.cards.removeAt(cardToPlay.toInt() - 1)
+                }
                 turn++
             }
             val computerActions = {
                 println("Computer plays ${computer.cards[0]}")
-                cardsOnTheTable.add(computer.cards[0])
+
+                if (cardsOnTheTable.isNotEmpty()) {
+
+                    if (computer.cards[0].rank == cardsOnTheTable.last().rank ||
+                        computer.cards[0].suit == cardsOnTheTable.last().suit
+                    ) {
+                        cardsOnTheTable.add(computer.cards[0])
+                        cardsOnTheTable.forEach { if (cardsGivePoints.contains(it.toString())) computer.score++ }
+                        computer.cardsWon += cardsOnTheTable.size
+                        cardsOnTheTable.clear()
+                        println(
+                            "${computer.player} wins cards\n" +
+                                    "Score: Player ${player.score} - Computer ${computer.score}\n" +
+                                    "Cards: Player ${player.cardsWon} - Computer ${computer.cardsWon}"
+                        )
+                        player.lastWon = false
+                    } else {
+                        cardsOnTheTable.add(computer.cards[0])
+                    }
+                } else {
+                    cardsOnTheTable.add(computer.cards[0])
+                }
                 computer.cards.removeAt(0)
                 turn--
             }
@@ -142,9 +226,9 @@ class Indigo {
             try {
                 list[turn].invoke()
             } catch (e: Exception) {
+                println(e.message)
                 break
             }
-            println()
         }
         println("Game Over")
     }
