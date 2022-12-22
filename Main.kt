@@ -4,8 +4,9 @@ import java.lang.Exception
 
 const val cardsGivePoints = "A♠A♥A♦A♣10♠10♥10♦10♣J♠J♦J♥J♣Q♠Q♥Q♦Q♣K♠K♥K♦K♣"
 
-open class Deck() {
+open class Deck {
     val allCards: MutableList<Card> = buildDeck()
+    val cardsOnTheTable: MutableList<Card> = mutableListOf()
 
     enum class Rank(val symbol: String) {
         ACE("A"),
@@ -48,36 +49,19 @@ open class Deck() {
         }
     }
 
-    data class Player(var cardsWon: Int, var score: Int, val player: String) {
-        val cards: MutableList<Card> = mutableListOf()
-        var lastWon = false
 
-        fun cardToPlay(): String {
-            println("Choose a card to play (1-${cards.size}):")
-            var cardToPlay = readln()
-            when {
-                cardToPlay.matches("""\d+""".toRegex()) && cardToPlay.toInt() in (1..cards.size) -> {
-                    return cardToPlay
-                }
-
-                cardToPlay.equals("exit", true) -> throw Exception("Game Over")
-                else -> cardToPlay = cardToPlay()
-            }
-            return cardToPlay
-        }
-    }
-
-    data class Message(val playerWon: Player = Player(0, 0, ""), val player: Player, val secondPlayer: Player) {
+    data class Message(val playerWon: String = "", val player: Player, val secondPlayer: Player) {
         override fun toString(): String {
-            if (playerWon.player == "") {
+            if (playerWon == "") {
                 return "Score: Player ${player.score} - Computer ${secondPlayer.score}\n" +
                         "Cards: Player ${player.cardsWon} - Computer ${secondPlayer.cardsWon}"
             }
-            return "${playerWon.player} wins cards\n" +
+            return "$playerWon wins cards\n" +
                     "Score: Player ${player.score} - Computer ${secondPlayer.score}\n" +
                     "Cards: Player ${player.cardsWon} - Computer ${secondPlayer.cardsWon}"
         }
     }
+
     private fun buildDeck(): MutableList<Card> {
         val allCards = buildList {
             Suit.values().forEach { suit ->
@@ -94,9 +78,90 @@ open class Deck() {
     }
 }
 
-class Indigo : Deck() {
-    private val cardsOnTheTable: MutableList<Card> = mutableListOf()
+open class Player(var cardsWon: Int, var score: Int, val player: String) : Deck() {
+    val cards: MutableList<Card> = mutableListOf()
+    var lastWon = false
 
+    fun throwCard(card: Int, cardsOnTheTable: MutableList<Card>) {
+        cardsOnTheTable.add(cards[card])
+        cards.removeAt(card)
+    }
+}
+
+class Human : Player(cardsWon = 0, score = 0, player = "Player") {
+    fun cardToPlay(): String {
+        print("Cards in hand: ")
+        cards.forEach { print("${cards.indexOf(it) + 1})$it ") }
+        println()
+        println("Choose a card to play (1-${cards.size}):")
+        var cardToPlay = readln()
+        when {
+            cardToPlay.matches("""\d+""".toRegex()) && cardToPlay.toInt() in (1..cards.size) -> {
+                return cardToPlay
+            }
+
+            cardToPlay.equals("exit", true) -> throw Exception("Game Over")
+            else -> cardToPlay = cardToPlay()
+        }
+        return cardToPlay
+    }
+
+}
+
+class Computer : Player(cardsWon = 0, score = 0, player = "Computer") {
+    fun cardToPlay(cardsOnTheTable: MutableList<Card>): String {
+        val isMatchRank = mutableListOf<Boolean>()
+        val isMatchSuit = mutableListOf<Boolean>()
+
+        println(cards.joinToString(" "))
+
+        if (cardsOnTheTable.isNotEmpty()){
+            cards.forEach {
+                isMatchRank.add(
+                    it.rank == cardsOnTheTable.last().rank
+                )
+                isMatchSuit.add(
+                    it.suit == cardsOnTheTable.last().suit
+                )
+            }
+        }
+
+        val countRank: Int = isMatchRank.count { it }
+        val countSuit: Int = isMatchSuit.count { it }
+
+        if(cardsOnTheTable.isEmpty() || countSuit + countRank == 0) {
+            val rank = cards.groupingBy { it.rank }.eachCount().filter { it.value > 1 }
+            val suit = cards.groupingBy { it.suit }.eachCount().filter { it.value > 1 }
+
+
+            return if (rank.size > suit.size) {
+                cards.indexOf(cards.first { it.rank == rank.keys.first() }).toString()
+            } else if (rank.size < suit.size){
+                cards.indexOf(cards.first { it.suit == suit.keys.first() }).toString()
+            } else if (suit.isNotEmpty()) {
+                cards.indexOf(cards.first { it.suit == suit.keys.first() }).toString()
+            } else {
+                "0"
+            }
+        }
+
+        when {
+            countSuit + countRank == 0 -> return "0"
+            countSuit in 1..2 -> return isMatchSuit.indexOf(true).toString()
+            countRank in 1..2 -> return isMatchRank.indexOf(true).toString()
+        }
+
+        return if (countRank > 2) {
+            val rank = cards.groupingBy { it.rank }.eachCount().filter { it.value > 1 }
+            cards.indexOf(cards.first { it.rank == rank.keys.first() }).toString()
+        } else {
+            val suit = cards.groupingBy { it.suit }.eachCount().filter { it.value > 1 }
+            cards.indexOf(cards.first { it.suit == suit.keys.first() }).toString()
+        }
+    }
+}
+
+class Indigo : Deck() {
     private fun getCards(number: Int): MutableList<Card> {
         allCards.subList(0, number).apply {
             val cards = mutableListOf<Card>()
@@ -119,11 +184,11 @@ class Indigo : Deck() {
     }
 
     fun play() {
-        val player = Player(0, 0, "Player")
-        val computer = Player(0, 0, "Computer")
-        val computerWon = Message(computer, player, computer)
-        val playerWon = Message(player, player, computer)
-        val neutral = Message(Player(0, 0, ""), player, computer)
+        val player = Human()
+        val computer = Computer()
+        val computerWon = Message(computer.player, player, computer)
+        val playerWon = Message(player.player, player, computer)
+        val neutral = Message("", player, computer)
         allCards.shuffle()
         println("Indigo Card Game")
 
@@ -131,27 +196,20 @@ class Indigo : Deck() {
         if (turn == 0) player.lastWon = true
 
         cardsOnTheTable.addAll(getCards(4))
-        println("Initial cards on the table: ${cardsOnTheTable.joinToString(" ")}\n")
+        println("Initial cards on the table: ${cardsOnTheTable.joinToString(" ")}")
         val playerActionsIfEmpty = {
-            print("Cards in hand: ")
-            player.cards.forEach { print("${player.cards.indexOf(it) + 1})$it ") }
-            println()
             val cardToPlay: String = player.cardToPlay()
-            cardsOnTheTable.add(player.cards[cardToPlay.toInt() - 1])
-            player.cards.removeAt(cardToPlay.toInt() - 1)
+            player.throwCard(cardToPlay.toInt() - 1, cardsOnTheTable)
             turn++
         }
         val computerActionsIfEmpty = {
-            println("Computer plays ${computer.cards[0]}")
-            cardsOnTheTable.add(computer.cards[0])
-            computer.cards.removeAt(0)
+            val cardToPlay = computer.cardToPlay(cardsOnTheTable)
+            println("Computer plays ${computer.cards[cardToPlay.toInt()]}")
+            computer.throwCard(cardToPlay.toInt(), cardsOnTheTable)
             turn--
         }
 
         val playerActions = {
-            print("Cards in hand: ")
-            player.cards.forEach { print("${player.cards.indexOf(it) + 1})$it ") }
-            println()
             val cardToPlay: String = player.cardToPlay()
 
             if (player.cards[cardToPlay.toInt() - 1].rank == cardsOnTheTable.last().rank ||
@@ -165,29 +223,28 @@ class Indigo : Deck() {
                 println(playerWon)
                 player.lastWon = true
             } else {
-                cardsOnTheTable.add(player.cards[cardToPlay.toInt() - 1])
-                player.cards.removeAt(cardToPlay.toInt() - 1)
+                player.throwCard(cardToPlay.toInt() - 1, cardsOnTheTable)
             }
 
             turn++
         }
         val computerActions = {
-            println("Computer plays ${computer.cards[0]}")
+            val cardToPlay = computer.cardToPlay(cardsOnTheTable)
+            println("Computer plays ${computer.cards[cardToPlay.toInt()]}")
 
-            if (computer.cards[0].rank == cardsOnTheTable.last().rank ||
-                computer.cards[0].suit == cardsOnTheTable.last().suit
+            if (computer.cards[cardToPlay.toInt()].rank == cardsOnTheTable.last().rank ||
+                computer.cards[cardToPlay.toInt()].suit == cardsOnTheTable.last().suit
             ) {
-                cardsOnTheTable.add(computer.cards[0])
+                computer.throwCard(cardToPlay.toInt(), cardsOnTheTable)
                 cardsOnTheTable.forEach { if (cardsGivePoints.contains(it.toString())) computer.score++ }
                 computer.cardsWon += cardsOnTheTable.size
                 cardsOnTheTable.clear()
                 println(computerWon)
                 player.lastWon = false
             } else {
-                cardsOnTheTable.add(computer.cards[0])
+                computer.throwCard(cardToPlay.toInt(), cardsOnTheTable)
             }
 
-            computer.cards.removeAt(0)
             turn--
         }
         val list =
@@ -216,6 +273,7 @@ class Indigo : Deck() {
                     list[turn].invoke()
                 }
             } catch (e: Exception) {
+                println(e.message)
                 println("Game Over")
                 return
             }
