@@ -90,9 +90,6 @@ open class Player(var cardsWon: Int, var score: Int, val player: String) : Deck(
 
 class Human : Player(cardsWon = 0, score = 0, player = "Player") {
     fun cardToPlay(): String {
-        print("Cards in hand: ")
-        cards.forEach { print("${cards.indexOf(it) + 1})$it ") }
-        println()
         println("Choose a card to play (1-${cards.size}):")
         var cardToPlay = readln()
         when {
@@ -133,30 +130,19 @@ class Computer : Player(cardsWon = 0, score = 0, player = "Computer") {
             val rank = cards.groupingBy { it.rank }.eachCount().filter { it.value > 1 }
             val suit = cards.groupingBy { it.suit }.eachCount().filter { it.value > 1 }
 
-
-            return if (rank.size > suit.size) {
+            return if (suit.isNotEmpty()) {
+                cards.indexOf(cards.first { it.suit == suit.keys.first() }).toString()
+            } else if (rank.isNotEmpty()){
                 cards.indexOf(cards.first { it.rank == rank.keys.first() }).toString()
-            } else if (rank.size < suit.size){
-                cards.indexOf(cards.first { it.suit == suit.keys.first() }).toString()
-            } else if (suit.isNotEmpty()) {
-                cards.indexOf(cards.first { it.suit == suit.keys.first() }).toString()
             } else {
                 "0"
             }
         }
 
-        when {
-            countSuit + countRank == 0 -> return "0"
-            countSuit in 1..2 -> return isMatchSuit.indexOf(true).toString()
-            countRank in 1..2 -> return isMatchRank.indexOf(true).toString()
-        }
-
-        return if (countRank > 2) {
-            val rank = cards.groupingBy { it.rank }.eachCount().filter { it.value > 1 }
-            cards.indexOf(cards.first { it.rank == rank.keys.first() }).toString()
-        } else {
-            val suit = cards.groupingBy { it.suit }.eachCount().filter { it.value > 1 }
-            cards.indexOf(cards.first { it.suit == suit.keys.first() }).toString()
+        return when {
+            countSuit + countRank == 0 -> "0"
+            countSuit < 2 && countRank > 0 -> isMatchRank.indexOf(true).toString()
+            else -> isMatchSuit.indexOf(true).toString()
         }
     }
 }
@@ -198,6 +184,9 @@ class Indigo : Deck() {
         cardsOnTheTable.addAll(getCards(4))
         println("Initial cards on the table: ${cardsOnTheTable.joinToString(" ")}")
         val playerActionsIfEmpty = {
+            print("Cards in hand: ")
+            player.cards.forEach { print("${player.cards.indexOf(it) + 1})$it ") }
+            println()
             val cardToPlay: String = player.cardToPlay()
             player.throwCard(cardToPlay.toInt() - 1, cardsOnTheTable)
             turn++
@@ -210,6 +199,9 @@ class Indigo : Deck() {
         }
 
         val playerActions = {
+            print("Cards in hand: ")
+            player.cards.forEach { print("${player.cards.indexOf(it) + 1})$it ") }
+            println()
             val cardToPlay: String = player.cardToPlay()
 
             if (player.cards[cardToPlay.toInt() - 1].rank == cardsOnTheTable.last().rank ||
@@ -244,7 +236,6 @@ class Indigo : Deck() {
             } else {
                 computer.throwCard(cardToPlay.toInt(), cardsOnTheTable)
             }
-
             turn--
         }
         val list =
